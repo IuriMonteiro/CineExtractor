@@ -81,20 +81,29 @@ export const ColorScriptView: React.FC<ColorScriptViewProps> = ({
       const x = startX + index * blockWidth;
 
       // 1. Draw thumbnail
-      const img = new Image();
-      img.onload = () => {
+      const drawThumb = (imageEl: HTMLImageElement) => {
         ctx.save();
         ctx.beginPath();
         ctx.rect(x + 2, startY, blockWidth - 4, thumbHeight);
         ctx.clip();
-        ctx.drawImage(img, x + 2, startY, blockWidth - 4, thumbHeight);
+        ctx.drawImage(imageEl, x + 2, startY, blockWidth - 4, thumbHeight);
         ctx.restore();
 
         // Thumbnail border
         ctx.strokeStyle = "rgba(255,255,255,0.2)";
         ctx.strokeRect(x + 2, startY, blockWidth - 4, thumbHeight);
       };
+
+      const img = new Image();
+      img.onload = () => drawThumb(img);
+      img.onerror = () => {
+        ctx.fillStyle = shot.dominantColor || "#1e293b";
+        ctx.fillRect(x + 2, startY, blockWidth - 4, thumbHeight);
+      };
       img.src = shot.keyframeDataUrl;
+      if (img.complete && img.naturalWidth > 0) {
+        drawThumb(img);
+      }
 
       // 2. Draw Color Palette vertical stripes
       const stripeY = startY + thumbHeight + 10;

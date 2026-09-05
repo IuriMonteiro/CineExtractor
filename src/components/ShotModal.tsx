@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Shot } from "../types";
 import { downloadDataUrl } from "../utils/exportUtils";
+import { EYECANDY_TECHNIQUES } from "../utils/eyecandyTaxonomy";
 
 interface ShotModalProps {
   shot: Shot | null;
@@ -26,6 +27,7 @@ interface ShotModalProps {
   onPrev?: () => void;
   onAnalyzeShot: (shot: Shot) => void;
   onGenerateGif: (shot: Shot) => void;
+  onOpenTaxonomyGuide?: (category?: any, technique?: string) => void;
 }
 
 export const ShotModal: React.FC<ShotModalProps> = ({
@@ -35,6 +37,7 @@ export const ShotModal: React.FC<ShotModalProps> = ({
   onPrev,
   onAnalyzeShot,
   onGenerateGif,
+  onOpenTaxonomyGuide,
 }) => {
   const [showRuleOfThirds, setShowRuleOfThirds] = useState(false);
   const [showCenterCross, setShowCenterCross] = useState(false);
@@ -337,6 +340,54 @@ export const ShotModal: React.FC<ShotModalProps> = ({
                       <span className="text-xs font-serif italic text-white">{analysis.lighting || "Chiaroscuro / Low Key"}</span>
                     </div>
                   </div>
+
+                  {/* Eyecandy Detected Movie Techniques */}
+                  {analysis.eyecandyTechniques && analysis.eyecandyTechniques.length > 0 && (
+                    <div className="bg-gradient-to-br from-neutral-900 via-neutral-950 to-pink-950/30 p-4 rounded-xl border border-pink-500/20 shadow-md">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[9px] uppercase tracking-widest font-mono text-pink-400 font-bold flex items-center gap-1.5">
+                          <Sparkles className="w-3 h-3 text-pink-400" />
+                          Eyecandy Movie Techniques
+                        </span>
+                        {onOpenTaxonomyGuide && (
+                          <button
+                            onClick={() => onOpenTaxonomyGuide("eyecandy")}
+                            className="text-[9px] uppercase tracking-wider text-pink-400 hover:text-pink-300 underline underline-offset-2"
+                          >
+                            Explore All
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {analysis.eyecandyTechniques.map((techName, idx) => {
+                          const matched = EYECANDY_TECHNIQUES.find(
+                            (t) => t.name.toLowerCase() === techName.toLowerCase() || t.id === techName.toLowerCase().replace(/[\s_]+/g, "-")
+                          );
+
+                          return (
+                            <button
+                              key={idx}
+                              onClick={() => onOpenTaxonomyGuide?.("eyecandy", techName)}
+                              className="px-2.5 py-1.5 rounded-lg bg-pink-950/40 hover:bg-pink-900/50 border border-pink-500/30 text-left transition-colors group/pill"
+                              title={matched ? `${matched.definition} (Click to view in reference)` : "Click to view technique"}
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] font-mono uppercase tracking-wider font-bold text-pink-300 group-hover/pill:text-white">
+                                  {techName}
+                                </span>
+                              </div>
+                              {matched && (
+                                <p className="text-[9px] text-neutral-400 font-serif italic line-clamp-1 max-w-[200px]">
+                                  {matched.definition}
+                                </p>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Mood & Narrative Function */}
                   {analysis.colorMood && (

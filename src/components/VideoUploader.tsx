@@ -22,6 +22,7 @@ export const VideoUploader: React.FC<VideoUploaderProps> = ({
   const [duration, setDuration] = useState(0);
   const [videoTitle, setVideoTitle] = useState<string>("No video loaded");
   const [isGeneratingDemo, setIsGeneratingDemo] = useState(false);
+  const [videoLoadError, setVideoLoadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = (file: File) => {
@@ -29,6 +30,7 @@ export const VideoUploader: React.FC<VideoUploaderProps> = ({
       alert("Please upload a valid video file (MP4, WebM, MOV, etc.)");
       return;
     }
+    setVideoLoadError(null);
     const url = URL.createObjectURL(file);
     setVideoTitle(file.name);
     onVideoSelected(url, file.name.replace(/\.[^/.]+$/, ""));
@@ -43,6 +45,7 @@ export const VideoUploader: React.FC<VideoUploaderProps> = ({
   };
 
   const handleSelectSample = (sample: SampleVideo) => {
+    setVideoLoadError(null);
     setVideoTitle(sample.title);
     onVideoSelected(sample.url, sample.id);
   };
@@ -50,6 +53,7 @@ export const VideoUploader: React.FC<VideoUploaderProps> = ({
   const handleGenerateProceduralDemo = async () => {
     try {
       setIsGeneratingDemo(true);
+      setVideoLoadError(null);
       const demo = await createSyntheticDemoVideo();
       setVideoTitle("Synthetic 4-Scene Cinematic Sequence");
       onVideoSelected(demo.url, "synthetic_cinematic_shots");
@@ -90,18 +94,44 @@ export const VideoUploader: React.FC<VideoUploaderProps> = ({
                 crossOrigin="anonymous"
                 className="w-full aspect-video object-contain bg-black"
                 playsInline
+                onError={() => {
+                  setVideoLoadError("Video could not be loaded or decoded. Use a bundled sample or generate a synthetic sequence.");
+                }}
                 onTimeUpdate={() => {
                   if (videoRef.current) {
                     setCurrentTime(videoRef.current.currentTime);
                   }
                 }}
                 onLoadedMetadata={() => {
+                  setVideoLoadError(null);
                   if (videoRef.current) {
                     setDuration(videoRef.current.duration);
                   }
                 }}
                 onEnded={() => setIsPlaying(false)}
               />
+
+              {videoLoadError && (
+                <div className="absolute inset-0 bg-neutral-950/95 flex flex-col items-center justify-center p-6 text-center z-20">
+                  <Film className="w-10 h-10 text-amber-400 mb-2" />
+                  <h3 className="text-lg font-serif italic text-white mb-1">Video Stream Unavailable</h3>
+                  <p className="text-xs text-neutral-400 max-w-sm mb-4 font-mono">{videoLoadError}</p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleGenerateProceduralDemo}
+                      className="px-4 py-2 bg-white text-black text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-neutral-200 transition-colors"
+                    >
+                      Use Synthetic Sequence
+                    </button>
+                    <button
+                      onClick={() => handleSelectSample(SAMPLE_VIDEOS[0])}
+                      className="px-4 py-2 bg-neutral-800 text-white text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-neutral-700 transition-colors border border-white/10"
+                    >
+                      Load Bundled Sample
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Top status indicator */}
               <div className="absolute top-4 right-4 z-10">

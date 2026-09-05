@@ -15,7 +15,7 @@ import { SAMPLE_VIDEOS } from "./utils/sampleVideos";
 
 export default function App() {
   const [videoUrl, setVideoUrl] = useState<string | null>(SAMPLE_VIDEOS[0].url);
-  const [videoTitle, setVideoTitle] = useState<string>("Tears of Steel (Sci-Fi Trailer)");
+  const [videoTitle, setVideoTitle] = useState<string>(SAMPLE_VIDEOS[0].title);
   const [shots, setShots] = useState<Shot[]>([]);
   const [activeTab, setActiveTab] = useState<"shots" | "colorscript">("shots");
 
@@ -41,6 +41,8 @@ export default function App() {
 
   const [selectedShot, setSelectedShot] = useState<Shot | null>(null);
   const [isTaxonomyGuideOpen, setIsTaxonomyGuideOpen] = useState(false);
+  const [taxonomyInitialCategory, setTaxonomyInitialCategory] = useState<any>("eyecandy");
+  const [taxonomyHighlightTechnique, setTaxonomyHighlightTechnique] = useState<string>("");
   const [isBatchAnalyzing, setIsBatchAnalyzing] = useState(false);
   const [isBatchGeneratingGifs, setIsBatchGeneratingGifs] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -292,6 +294,12 @@ export default function App() {
     }
   };
 
+  const handleOpenTaxonomyGuide = (category: any = "eyecandy", technique: string = "") => {
+    setTaxonomyInitialCategory(category);
+    setTaxonomyHighlightTechnique(technique);
+    setIsTaxonomyGuideOpen(true);
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950">
       {/* Header */}
@@ -299,7 +307,7 @@ export default function App() {
         shotsCount={shots.length}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        onOpenTaxonomyGuide={() => setIsTaxonomyGuideOpen(true)}
+        onOpenTaxonomyGuide={() => handleOpenTaxonomyGuide("eyecandy")}
         onExportAll={handleExportAll}
         isExporting={isExporting}
       />
@@ -383,12 +391,15 @@ export default function App() {
         onPrev={currentShotIndex > 0 ? handlePrevModalShot : undefined}
         onAnalyzeShot={handleAnalyzeShot}
         onGenerateGif={handleGenerateGif}
+        onOpenTaxonomyGuide={handleOpenTaxonomyGuide}
       />
 
       {/* StudioBinder & Eyecannndy Reference Guide Modal */}
       <TaxonomyReferenceModal
         isOpen={isTaxonomyGuideOpen}
         onClose={() => setIsTaxonomyGuideOpen(false)}
+        initialCategory={taxonomyInitialCategory}
+        highlightTechnique={taxonomyHighlightTechnique}
       />
 
       {/* Clean Footer */}

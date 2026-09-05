@@ -11,6 +11,7 @@ export interface ShotAnalysis {
   narrativeFunction: string; // Psychological / storytelling intent
   directorStyle?: string; // e.g. "Roger Deakins", "Denis Villeneuve", "Wes Anderson"
   confidenceScore?: number; // 0 - 100
+  eyecandyTechniques?: string[]; // Detected Eyecannndy techniques (e.g. ["HALATION", "CENTRAL FRAMING", "DOLLY ZOOM", "SNORRICAM"])
 }
 
 export interface Shot {

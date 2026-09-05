@@ -1,5 +1,5 @@
 import React from "react";
-import { Film, BookOpen, Palette, FolderDown } from "lucide-react";
+import { Film, BookOpen, Palette, FolderDown, Sparkles } from "lucide-react";
 
 interface HeaderProps {
   shotsCount: number;
@@ -66,11 +66,11 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             id="taxonomy-guide-btn"
             onClick={onOpenTaxonomyGuide}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-white/15 text-neutral-400 hover:text-white hover:border-white/40 transition-all"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-pink-500/30 text-neutral-300 hover:text-white hover:border-pink-500/60 bg-pink-950/20 transition-all"
             title="StudioBinder & Eyecannndy Cinematography Reference"
           >
-            <BookOpen className="w-3.5 h-3.5 text-neutral-400" />
-            <span className="hidden sm:inline">Taxonomy Guide</span>
+            <Sparkles className="w-3.5 h-3.5 text-pink-400" />
+            <span className="hidden sm:inline text-pink-200">Eyecandy & Taxonomy</span>
           </button>
 
           {shotsCount > 0 && (

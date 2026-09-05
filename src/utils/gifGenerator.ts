@@ -40,13 +40,23 @@ export async function generateShotGif(
   const delay = Math.round(1000 / fps);
 
   const seek = (time: number): Promise<void> => {
+    const target = Math.max(0, Math.min(time, video.duration - 0.05));
+    if (Math.abs(video.currentTime - target) < 0.02) {
+      return Promise.resolve();
+    }
     return new Promise((resolve) => {
+      let timer: any;
       const onSeeked = () => {
+        clearTimeout(timer);
         video.removeEventListener("seeked", onSeeked);
         resolve();
       };
-      video.addEventListener("seeked", onSeeked);
-      video.currentTime = Math.min(time, video.duration - 0.05);
+      timer = setTimeout(() => {
+        video.removeEventListener("seeked", onSeeked);
+        resolve();
+      }, 600);
+      video.addEventListener("seeked", onSeeked, { once: true });
+      video.currentTime = target;
     });
   };
 

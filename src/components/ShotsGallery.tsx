@@ -45,6 +45,9 @@ export const ShotsGallery: React.FC<ShotsGalleryProps> = ({
     if (filterType === "all") return true;
     if (filterType === "with_gif") return Boolean(shot.gifDataUrl);
     if (filterType === "with_ai") return Boolean(shot.analysis);
+    if (filterType === "with_eyecandy") {
+      return Boolean(shot.analysis?.eyecandyTechniques && shot.analysis.eyecandyTechniques.length > 0);
+    }
     if (filterType === "closeups") {
       const size = shot.analysis?.shotSize?.toLowerCase() || "";
       return size.includes("close") || size.includes("cu");
@@ -58,6 +61,7 @@ export const ShotsGallery: React.FC<ShotsGalleryProps> = ({
 
   const analyzedCount = shots.filter((s) => s.analysis).length;
   const gifCount = shots.filter((s) => s.gifDataUrl).length;
+  const eyecandyCount = shots.filter((s) => s.analysis?.eyecandyTechniques && s.analysis.eyecandyTechniques.length > 0).length;
 
   return (
     <div className="mt-8 space-y-6">
@@ -164,6 +168,14 @@ export const ShotsGallery: React.FC<ShotsGalleryProps> = ({
             }`}
           >
             Identified AI ({analyzedCount})
+          </button>
+          <button
+            onClick={() => setFilterType("with_eyecandy")}
+            className={`px-3 py-1 rounded-full text-[10px] uppercase tracking-widest font-bold border transition-colors ${
+              filterType === "with_eyecandy" ? "bg-pink-600 text-white border-pink-500 shadow-md shadow-pink-600/20" : "bg-neutral-950 text-pink-400/80 border-pink-500/20 hover:text-pink-300"
+            }`}
+          >
+            Eyecandy FX ({eyecandyCount})
           </button>
           <button
             onClick={() => setFilterType("with_gif")}

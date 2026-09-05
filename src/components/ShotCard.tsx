@@ -166,6 +166,25 @@ export const ShotCard: React.FC<ShotCardProps> = ({
                   "{shot.analysis.colorMood}"
                 </p>
               )}
+
+              {/* Eyecandy Movie Techniques Badges */}
+              {shot.analysis.eyecandyTechniques && shot.analysis.eyecandyTechniques.length > 0 && (
+                <div className="flex flex-wrap gap-1 pt-1.5 border-t border-white/5">
+                  {shot.analysis.eyecandyTechniques.slice(0, 3).map((tech, idx) => (
+                    <span
+                      key={idx}
+                      className="px-1.5 py-0.5 rounded text-[8px] font-mono uppercase tracking-wider font-bold bg-pink-950/40 text-pink-300 border border-pink-500/30"
+                    >
+                      {tech}
+                    </span>
+                  ))}
+                  {shot.analysis.eyecandyTechniques.length > 3 && (
+                    <span className="px-1 py-0.5 text-[8px] font-mono text-neutral-400">
+                      +{shot.analysis.eyecandyTechniques.length - 3}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <div className="mb-3 py-1">
