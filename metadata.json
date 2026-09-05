@@ -1,0 +1,6 @@
+{
+  "name": "CineShot - Scene Extractor & Color Script Analyzer",
+  "description": "Automatic scene detection, frame & GIF extractor, visual color script generator, and StudioBinder shot taxonomy identifier.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
