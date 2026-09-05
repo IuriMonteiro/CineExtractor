@@ -7,12 +7,13 @@
 [![Vite](https://img.shields.io/badge/Vite-6.2-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 
+
+> An intelligent, browser-based director's suite that automatically slices video footage into individual shots, generates animated looping GIFs, extracts continuous color scripts, and categorizes visual grammar using the **StudioBinder 8-axis taxonomy** and **Eyecannndy movie techniques catalog**.
+
 <img width="1170" height="670" alt="image" src="https://github.com/user-attachments/assets/4bb9496c-b485-42f9-8a58-0826f1d199bf" />
 <img width="1135" height="592" alt="image" src="https://github.com/user-attachments/assets/2323d75e-d641-49b5-ad21-d7cb1bbd61ac" />
 <img width="1142" height="452" alt="image" src="https://github.com/user-attachments/assets/18990aaf-2a53-4b14-88fb-89ab928d0d43" />
 
-
-> An intelligent, browser-based director's suite that automatically slices video footage into individual shots, generates animated looping GIFs, extracts continuous color scripts, and categorizes visual grammar using the **StudioBinder 8-axis taxonomy** and **Eyecannndy movie techniques catalog**.
 
 ---
 
