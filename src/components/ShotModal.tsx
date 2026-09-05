@@ -19,6 +19,7 @@ import {
 import { Shot } from "../types";
 import { downloadDataUrl } from "../utils/exportUtils";
 import { EYECANDY_TECHNIQUES } from "../utils/eyecandyTaxonomy";
+import { formatTimecode } from "../utils/timeUtils";
 
 interface ShotModalProps {
   shot: Shot | null;
@@ -58,12 +59,7 @@ export const ShotModal: React.FC<ShotModalProps> = ({
 
   if (!shot) return null;
 
-  const formatTime = (s: number) => {
-    const mins = Math.floor(s / 60);
-    const secs = Math.floor(s % 60);
-    const frames = Math.floor((s % 1) * 24);
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}:${frames.toString().padStart(2, "0")}`;
-  };
+  const formatTime = (s: number) => formatTimecode(s, true);
 
   const copyHex = (hex: string) => {
     navigator.clipboard.writeText(hex);

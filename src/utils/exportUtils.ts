@@ -26,7 +26,7 @@ export async function exportShotsZip(
     const screensFolder = rootFolder.folder("screens");
     shots.forEach((shot) => {
       const base64 = shot.keyframeDataUrl.replace(/^data:image\/[a-z]+;base64,/, "");
-      const fileName = `shot_${shot.shotNumber.toString().padStart(3, "0")}_${formatTimecode(shot.startTime).replace(/:/g, "-")}.jpg`;
+      const fileName = `shot_${shot.shotNumber.toString().padStart(5, "0")}_${formatTimecode(shot.startTime).replace(/:/g, "-")}.jpg`;
       screensFolder?.file(fileName, base64, { base64: true });
     });
   }
@@ -37,7 +37,7 @@ export async function exportShotsZip(
     shots.forEach((shot) => {
       if (shot.gifDataUrl) {
         const base64 = shot.gifDataUrl.replace(/^data:image\/gif;base64,/, "");
-        const fileName = `shot_${shot.shotNumber.toString().padStart(3, "0")}.gif`;
+        const fileName = `shot_${shot.shotNumber.toString().padStart(5, "0")}.gif`;
         gifsFolder?.file(fileName, base64, { base64: true });
       }
     });

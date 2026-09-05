@@ -12,6 +12,7 @@ import { detectScenesFromVideo } from "./utils/sceneDetector";
 import { generateShotGif } from "./utils/gifGenerator";
 import { exportShotsZip } from "./utils/exportUtils";
 import { SAMPLE_VIDEOS } from "./utils/sampleVideos";
+import { formatTimecode } from "./utils/timeUtils";
 
 export default function App() {
   const [videoUrl, setVideoUrl] = useState<string | null>(SAMPLE_VIDEOS[0].url);
@@ -22,8 +23,11 @@ export default function App() {
   const [config, setConfig] = useState<ExtractionConfig>({
     sensitivity: 24,
     minShotDuration: 0.6,
-    maxShots: 36,
-    sampleFps: 6,
+    maxShots: 0, // 0 = Unlimited (no limits: extracts whatever is in the video, 1000, 20000+ cuts)
+    sampleFps: 2.5,
+    scanRangeMode: "full",
+    startTime: 0,
+    endTime: 0,
     exportMode: "both",
     folderName: "CineShot_Project",
     gifFps: 8,
@@ -49,6 +53,27 @@ export default function App() {
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Automatically adapt scan settings for feature films (> 30 mins)
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const onMeta = () => {
+      if (video.duration > 1800) {
+        // Switch to Movie Speed (1 fps) so full feature film scans without freezing
+        setConfig((prev) => ({
+          ...prev,
+          sampleFps: 1.0,
+          maxShots: Math.max(prev.maxShots, 300),
+        }));
+      }
+    };
+
+    video.addEventListener("loadedmetadata", onMeta);
+    if (video.duration > 0) onMeta();
+    return () => video.removeEventListener("loadedmetadata", onMeta);
+  }, [videoUrl]);
 
   const handleVideoSelected = (url: string, fileName: string) => {
     setVideoUrl(url);
@@ -102,9 +127,11 @@ export default function App() {
       setShots(detectedShots);
       setIsDetecting(false);
 
-      // If user selected GIFs mode or both, trigger background GIF generation for shots
+      // If user selected GIFs mode or both, trigger background GIF generation
+      // For large extractions (> 24 shots), limit initial auto-batch to 12 shots to protect browser memory
       if (config.exportMode === "gifs" || config.exportMode === "both") {
-        generateGifsForShots(detectedShots);
+        const batchLimit = detectedShots.length > 24 ? 12 : undefined;
+        generateGifsForShots(detectedShots, batchLimit);
       }
     } catch (err: any) {
       console.warn("Detection stopped or failed:", err);
@@ -155,13 +182,15 @@ export default function App() {
     }
   };
 
-  // Generate GIFs for all shots in sequence
-  const generateGifsForShots = async (targetShots: Shot[]) => {
+  // Generate GIFs for shots in sequence
+  const generateGifsForShots = async (targetShots: Shot[], maxBatchCount?: number) => {
     if (!videoRef.current) return;
     setIsBatchGeneratingGifs(true);
 
-    for (const shot of targetShots) {
-      if (shot.gifDataUrl) continue;
+    const ungenerated = targetShots.filter((s) => !s.gifDataUrl);
+    const pool = maxBatchCount ? ungenerated.slice(0, maxBatchCount) : ungenerated;
+
+    for (const shot of pool) {
       try {
         setShots((prev) =>
           prev.map((s) => (s.id === shot.id ? { ...s, isGifGenerating: true } : s))
@@ -183,6 +212,9 @@ export default function App() {
             s.id === shot.id ? { ...s, gifDataUrl, isGifGenerating: false } : s
           )
         );
+
+        // Yield slightly between GIFs to keep the browser snappy
+        await new Promise((r) => setTimeout(r, 60));
       } catch (err) {
         console.warn(`GIF generation failed for shot ${shot.shotNumber}`, err);
         setShots((prev) =>
@@ -201,9 +233,7 @@ export default function App() {
         prev.map((s) => (s.id === shot.id ? { ...s, isAnalyzing: true } : s))
       );
 
-      const mins = Math.floor(shot.startTime / 60);
-      const secs = Math.floor(shot.startTime % 60);
-      const timecode = `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+      const timecode = formatTimecode(shot.startTime, true);
 
       const res = await fetch("/api/analyze-shot", {
         method: "POST",
@@ -330,6 +360,7 @@ export default function App() {
           onCancelDetection={handleCancelDetection}
           isDetecting={isDetecting}
           hasVideo={Boolean(videoUrl)}
+          videoDuration={videoRef.current?.duration || 0}
         />
 
         {/* Progress Bar when scanning */}

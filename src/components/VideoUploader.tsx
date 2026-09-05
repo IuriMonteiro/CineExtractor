@@ -2,6 +2,7 @@ import React, { useRef, useState } from "react";
 import { UploadCloud, Play, Pause, Film, Sparkles, Video as VideoIcon, CheckCircle } from "lucide-react";
 import { SAMPLE_VIDEOS, createSyntheticDemoVideo } from "../utils/sampleVideos";
 import { SampleVideo } from "../types";
+import { formatTimecode } from "../utils/timeUtils";
 
 interface VideoUploaderProps {
   videoUrl: string | null;
@@ -75,11 +76,7 @@ export const VideoUploader: React.FC<VideoUploaderProps> = ({
     }
   };
 
-  const formatSeconds = (sec: number) => {
-    const m = Math.floor(sec / 60);
-    const s = Math.floor(sec % 60);
-    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-  };
+  const formatSeconds = (sec: number) => formatTimecode(sec);
 
   return (
     <div className="bg-neutral-900/60 border border-white/5 rounded-2xl p-6 shadow-2xl">

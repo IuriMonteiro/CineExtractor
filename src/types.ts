@@ -37,9 +37,12 @@ export interface Shot {
 
 export interface ExtractionConfig {
   sensitivity: number; // 15 to 45 (threshold delta for cut detection)
-  minShotDuration: number; // e.g. 0.4s to 2.0s
-  maxShots: number; // 10 to 60
-  sampleFps: number; // 4 to 10
+  minShotDuration: number; // e.g. 0.2s to 3.0s
+  maxShots: number; // 0 = Unlimited (no limits: extracts whatever is in video: 1,000, 20,000+ shots)
+  sampleFps: number; // 1 to 8 (1 = fast movie mode, 2.5 = balanced, 6 = precision)
+  scanRangeMode: "full" | "range"; // Full video vs specific time window
+  startTime: number; // in seconds
+  endTime: number; // in seconds (0 = full duration)
   exportMode: "images" | "gifs" | "both";
   folderName: string;
   gifFps: number; // 6 to 15 fps

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Shot } from "../types";
 import { downloadDataUrl } from "../utils/exportUtils";
+import { formatTimecode } from "../utils/timeUtils";
 
 interface ShotCardProps {
   shot: Shot;
@@ -29,12 +30,7 @@ export const ShotCard: React.FC<ShotCardProps> = ({
   const [copiedColor, setCopiedColor] = useState<string | null>(null);
   const [showGif, setShowGif] = useState(false);
 
-  const formatTimecode = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    const frames = Math.floor((seconds % 1) * 24);
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}:${frames.toString().padStart(2, "0")}`;
-  };
+  const displayTimecode = (seconds: number) => formatTimecode(seconds, true);
 
   const handleCopyHex = (color: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -119,7 +115,7 @@ export const ShotCard: React.FC<ShotCardProps> = ({
 
         {/* Bottom Timecode banner */}
         <div className="absolute bottom-2 left-2.5 text-[9px] font-mono text-white/80 bg-black/80 px-2 py-0.5 rounded backdrop-blur-sm border border-white/10">
-          {formatTimecode(shot.startTime)} → {formatTimecode(shot.endTime)}
+          {displayTimecode(shot.startTime)} → {displayTimecode(shot.endTime)}
         </div>
       </div>
 

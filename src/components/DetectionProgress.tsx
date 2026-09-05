@@ -1,5 +1,6 @@
 import React from "react";
-import { Loader2, Film, CheckCircle2 } from "lucide-react";
+import { Film, CheckCircle2 } from "lucide-react";
+import { formatTimecode } from "../utils/timeUtils";
 
 interface DetectionProgressProps {
   percentage: number;
@@ -16,12 +17,6 @@ export const DetectionProgress: React.FC<DetectionProgressProps> = ({
   shotsFound,
   stage,
 }) => {
-  const formatTime = (s: number) => {
-    const mins = Math.floor(s / 60);
-    const secs = Math.floor(s % 60);
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  };
-
   return (
     <div className="bg-neutral-900/80 border border-white/10 rounded-2xl p-6 shadow-2xl my-5 animate-in fade-in zoom-in-95 duration-200">
       <div className="flex items-center justify-between mb-4">
@@ -42,13 +37,13 @@ export const DetectionProgress: React.FC<DetectionProgressProps> = ({
             {percentage}%
           </span>
           <p className="text-[10px] font-mono text-neutral-400">
-            {formatTime(currentSecond)} / {formatTime(totalSeconds)}
+            {formatTimecode(currentSecond)} / {formatTimecode(totalSeconds)}
           </p>
         </div>
       </div>
 
       {/* Progress Bar */}
-      <div className="w-full h-1 bg-neutral-950 rounded-full overflow-hidden border border-white/5 mb-5">
+      <div className="w-full h-1.5 bg-neutral-950 rounded-full overflow-hidden border border-white/5 mb-5">
         <div
           className="h-full bg-white transition-all duration-150 rounded-full"
           style={{ width: `${percentage}%` }}
@@ -72,7 +67,7 @@ export const DetectionProgress: React.FC<DetectionProgressProps> = ({
             Current Pass
           </span>
           <span className="text-xs font-serif italic text-neutral-200 mt-1 block">
-            {percentage < 50 ? "Boundary Transition Scan" : "Color Extraction"}
+            {percentage < 50 ? "Boundary Transition Scan" : "Color & Keyframe Extraction"}
           </span>
         </div>
 

@@ -21,10 +21,13 @@ Whether you are a filmmaker creating reference shot decks, a colorist studying p
 
 ## ✨ Key Features
 
-### 🎞️ 1. Automatic Scene Cut Detection
+### 🎞️ 1. Automatic Scene Cut Detection (Short Clips & 2-Hour Feature Films)
 - **Client-Side Processing**: Zero video uploads to external servers for slicing; all frame analysis runs locally in the browser via HTML5 Canvas.
-- **Customizable Thresholds**: Fine-tune difference threshold (sensitivity), minimum shot duration (0.5s – 5.0s), and frame sampling rate (12–30 fps).
-- **Instant Synthetic Demo**: Don't have a video handy? Click **"Generate Synthetic 4-Scene Demo"** to generate an instant 10-second multi-scene test video on the fly with HTML5 Canvas & MediaRecorder.
+- **Long-Form & Feature Film Ready**: Built to handle videos ranging from 30-second clips to full 2-hour movies without crashing or running out of memory.
+- **Range Scanning (Time Windows)**: Analyze entire videos or isolate specific time windows (e.g. `00:14:30` to `00:28:45`) using intuitive timecode inputs or quick presets (first 3 min, 5 min, 15 min, etc.).
+- **Smart Adaptive Sampling**: Dynamically scales sampling density (1.0 fps Movie Speed, 2.5 fps Standard, 6.0 fps Fine) and yields execution every few frames to prevent browser freezing.
+- **Zero Ceilings & Unlimited Cuts**: No artificial shot limits. Whether a sequence has 50 cuts, 1,000 cuts, or a feature film has 20,000 cuts, CineShot captures every transition. Includes dynamic memory-safe scaling, client pagination, and movie barcode scrubbing.
+- **Instant Synthetic Demo**: Don't have a video handy? Click **"Generate Synthetic 4-Scene Demo"** to generate an instant multi-scene test video on the fly with HTML5 Canvas & MediaRecorder.
 
 ### 🖼️ 2. High-Res Stills & Looping GIF Generator
 - **Automatic Keyframe Extraction**: Captures crisp full-resolution stills at the golden ratio moment of every detected shot.

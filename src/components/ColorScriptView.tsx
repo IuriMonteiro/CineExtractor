@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Shot } from "../types";
 import { downloadDataUrl } from "../utils/exportUtils";
+import { formatTimecode } from "../utils/timeUtils";
 
 interface ColorScriptViewProps {
   shots: Shot[];
@@ -32,6 +33,65 @@ export const ColorScriptView: React.FC<ColorScriptViewProps> = ({
   const [isLoadingAI, setIsLoadingAI] = useState<boolean>(false);
   const [selectedShotIndex, setSelectedShotIndex] = useState<number | null>(null);
   const [copiedHex, setCopiedHex] = useState<string | null>(null);
+  const [windowStart, setWindowStart] = useState<number>(0);
+  const barcodeCanvasRef = useRef<HTMLCanvasElement>(null);
+  const WINDOW_SIZE = 48;
+  const isLargeSet = shots.length > 60;
+  const visibleShots = isLargeSet ? shots.slice(windowStart, windowStart + WINDOW_SIZE) : shots;
+
+  // Jump window when a shot is selected from the barcode or modal
+  const handleSelectShot = (idx: number) => {
+    setSelectedShotIndex(idx);
+    if (isLargeSet) {
+      if (idx < windowStart || idx >= windowStart + WINDOW_SIZE) {
+        const newStart = Math.max(0, Math.min(shots.length - WINDOW_SIZE, Math.floor(idx - WINDOW_SIZE / 2)));
+        setWindowStart(newStart);
+      }
+    }
+  };
+
+  // Render mini interactive film barcode scrubber for large datasets
+  useEffect(() => {
+    const canvas = barcodeCanvasRef.current;
+    if (!canvas || shots.length === 0 || !isLargeSet) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const width = canvas.width;
+    const height = canvas.height;
+
+    ctx.clearRect(0, 0, width, height);
+
+    const sliceWidth = width / shots.length;
+
+    shots.forEach((shot, i) => {
+      ctx.fillStyle = shot.dominantColor || "#1e293b";
+      ctx.fillRect(i * sliceWidth, 0, Math.max(1, sliceWidth), height);
+    });
+
+    // Draw active window indicator
+    if (isLargeSet) {
+      const startX = (windowStart / shots.length) * width;
+      const windowWidth = (WINDOW_SIZE / shots.length) * width;
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(startX, 1, Math.max(8, windowWidth), height - 2);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.25)";
+      ctx.fillRect(startX, 1, Math.max(8, windowWidth), height - 2);
+    }
+  }, [shots, windowStart, isLargeSet]);
+
+  const handleBarcodeClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = barcodeCanvasRef.current;
+    if (!canvas || shots.length === 0) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+    const targetIdx = Math.min(shots.length - 1, Math.floor(ratio * shots.length));
+    handleSelectShot(targetIdx);
+  };
 
   // Generate Panoramic Color Script Canvas
   const renderColorScriptCanvas = () => {
@@ -41,7 +101,17 @@ export const ColorScriptView: React.FC<ColorScriptViewProps> = ({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const totalWidth = Math.max(1200, shots.length * 140);
+    // Scale canvas width dynamically within browser GPU limits (max 12000px)
+    const maxSafeCanvasWidth = 12000;
+    const isUltraDense = shots.length > 250;
+    const blockWidth = isUltraDense
+      ? Math.max(1, (maxSafeCanvasWidth - 60) / shots.length)
+      : Math.max(30, Math.min(140, Math.floor(maxSafeCanvasWidth / Math.max(1, shots.length))));
+
+    const totalWidth = isUltraDense
+      ? maxSafeCanvasWidth
+      : Math.min(maxSafeCanvasWidth, Math.max(1200, shots.length * blockWidth + 60));
+
     const totalHeight = 440;
     canvas.width = totalWidth;
     canvas.height = totalHeight;
@@ -58,7 +128,7 @@ export const ColorScriptView: React.FC<ColorScriptViewProps> = ({
     ctx.fillStyle = "#94a3b8";
     ctx.font = "12px sans-serif";
     ctx.fillText(
-      `${shots.length} SCENE CUTS • CHRONOLOGICAL EMOTIONAL HARMONY & PALETTE PROGRESSION`,
+      `${shots.length.toLocaleString()} SCENE CUTS • CHRONOLOGICAL EMOTIONAL HARMONY & PALETTE PROGRESSION`,
       30,
       60
     );
@@ -73,55 +143,70 @@ export const ColorScriptView: React.FC<ColorScriptViewProps> = ({
 
     const startX = 30;
     const startY = 95;
-    const blockWidth = (totalWidth - 60) / shots.length;
+    const actualBlockWidth = (totalWidth - 60) / shots.length;
     const thumbHeight = 110;
     const paletteHeight = 160;
 
     shots.forEach((shot, index) => {
-      const x = startX + index * blockWidth;
+      const x = startX + index * actualBlockWidth;
 
-      // 1. Draw thumbnail
-      const drawThumb = (imageEl: HTMLImageElement) => {
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(x + 2, startY, blockWidth - 4, thumbHeight);
-        ctx.clip();
-        ctx.drawImage(imageEl, x + 2, startY, blockWidth - 4, thumbHeight);
-        ctx.restore();
+      if (!isUltraDense && actualBlockWidth >= 24) {
+        // 1. Draw thumbnail
+        const drawThumb = (imageEl: HTMLImageElement) => {
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(x + 1, startY, actualBlockWidth - 2, thumbHeight);
+          ctx.clip();
+          ctx.drawImage(imageEl, x + 1, startY, actualBlockWidth - 2, thumbHeight);
+          ctx.restore();
 
-        // Thumbnail border
-        ctx.strokeStyle = "rgba(255,255,255,0.2)";
-        ctx.strokeRect(x + 2, startY, blockWidth - 4, thumbHeight);
-      };
+          // Thumbnail border
+          ctx.strokeStyle = "rgba(255,255,255,0.2)";
+          ctx.strokeRect(x + 1, startY, actualBlockWidth - 2, thumbHeight);
+        };
 
-      const img = new Image();
-      img.onload = () => drawThumb(img);
-      img.onerror = () => {
+        const img = new Image();
+        img.onload = () => drawThumb(img);
+        img.onerror = () => {
+          ctx.fillStyle = shot.dominantColor || "#1e293b";
+          ctx.fillRect(x + 1, startY, actualBlockWidth - 2, thumbHeight);
+        };
+        img.src = shot.keyframeDataUrl;
+        if (img.complete && img.naturalWidth > 0) {
+          drawThumb(img);
+        }
+
+        // 2. Draw Color Palette vertical stripes
+        const stripeY = startY + thumbHeight + 10;
+        const stripeHeight = paletteHeight / shot.palette.length;
+
+        shot.palette.forEach((hex, pIndex) => {
+          ctx.fillStyle = hex;
+          ctx.fillRect(x + 1, stripeY + pIndex * stripeHeight, actualBlockWidth - 2, stripeHeight);
+        });
+
+        // 3. Draw Shot Number & Timecode label below
+        ctx.fillStyle = "#f59e0b";
+        ctx.font = "bold 9px monospace";
+        ctx.fillText(`S#${shot.shotNumber}`, x + 2, stripeY + paletteHeight + 18);
+
+        ctx.fillStyle = "#64748b";
+        ctx.font = "8px monospace";
+        ctx.fillText(`${shot.duration}s`, x + 2, stripeY + paletteHeight + 30);
+      } else {
+        // Ultra-dense Movie Barcode rendering (instantaneous for 1,000 to 20,000 cuts)
+        // Top section: dominant chromatic tone
         ctx.fillStyle = shot.dominantColor || "#1e293b";
-        ctx.fillRect(x + 2, startY, blockWidth - 4, thumbHeight);
-      };
-      img.src = shot.keyframeDataUrl;
-      if (img.complete && img.naturalWidth > 0) {
-        drawThumb(img);
+        ctx.fillRect(x, startY, Math.max(1, actualBlockWidth), thumbHeight);
+
+        // Middle section: palette color bands
+        const stripeY = startY + thumbHeight + 4;
+        const stripeHeight = paletteHeight / shot.palette.length;
+        shot.palette.forEach((hex, pIndex) => {
+          ctx.fillStyle = hex;
+          ctx.fillRect(x, stripeY + pIndex * stripeHeight, Math.max(1, actualBlockWidth), stripeHeight);
+        });
       }
-
-      // 2. Draw Color Palette vertical stripes
-      const stripeY = startY + thumbHeight + 10;
-      const stripeHeight = paletteHeight / shot.palette.length;
-
-      shot.palette.forEach((hex, pIndex) => {
-        ctx.fillStyle = hex;
-        ctx.fillRect(x + 2, stripeY + pIndex * stripeHeight, blockWidth - 4, stripeHeight);
-      });
-
-      // 3. Draw Shot Number & Timecode label below
-      ctx.fillStyle = "#f59e0b";
-      ctx.font = "bold 10px monospace";
-      ctx.fillText(`S#${shot.shotNumber}`, x + 4, stripeY + paletteHeight + 18);
-
-      ctx.fillStyle = "#64748b";
-      ctx.font = "9px monospace";
-      ctx.fillText(`${shot.duration}s`, x + 4, stripeY + paletteHeight + 32);
     });
 
     // Wave / Temperature Curve at bottom
@@ -130,7 +215,7 @@ export const ColorScriptView: React.FC<ColorScriptViewProps> = ({
     ctx.lineWidth = 2;
     ctx.beginPath();
     shots.forEach((shot, i) => {
-      const x = startX + i * blockWidth + blockWidth / 2;
+      const x = startX + i * actualBlockWidth + actualBlockWidth / 2;
       const y = curveY - shot.warmth * 25;
       if (i === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
@@ -152,7 +237,7 @@ export const ColorScriptView: React.FC<ColorScriptViewProps> = ({
       setIsLoadingAI(true);
       const palettes = shots.map((s) => ({
         shotNumber: s.shotNumber,
-        timecode: `${Math.floor(s.startTime / 60)}:${Math.floor(s.startTime % 60)}`,
+        timecode: formatTimecode(s.startTime),
         dominantColor: s.dominantColor,
         palette: s.palette,
         warmth: s.warmth,
@@ -259,66 +344,138 @@ export const ColorScriptView: React.FC<ColorScriptViewProps> = ({
       </div>
 
       {/* Panoramic Color Script Interactive Ribbon */}
-      <div className="bg-neutral-900/60 border border-white/5 rounded-2xl p-6 shadow-2xl">
-        <div className="flex items-center justify-between mb-3">
+      <div className="bg-neutral-900/60 border border-white/5 rounded-2xl p-6 shadow-2xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <h3 className="text-xs uppercase tracking-[0.2em] font-bold text-neutral-300">
               Sequential Color Script Timeline
             </h3>
+            {isLargeSet && (
+              <span className="text-[10px] font-mono text-neutral-400 bg-neutral-950 px-2 py-0.5 rounded border border-white/10">
+                Cuts {windowStart + 1}–{Math.min(shots.length, windowStart + WINDOW_SIZE)} of {shots.length.toLocaleString()}
+              </span>
+            )}
           </div>
           <span className="text-[10px] uppercase tracking-widest font-mono text-neutral-500">
-            Click any column to inspect
+            {isLargeSet ? "Click barcode or cards to inspect" : "Click any column to inspect"}
           </span>
         </div>
+
+        {/* High-speed Barcode Scrubber for Large Datasets */}
+        {isLargeSet && (
+          <div className="bg-neutral-950 p-3 rounded-xl border border-white/5 space-y-2">
+            <div className="flex items-center justify-between text-[10px] font-mono text-neutral-400">
+              <span className="uppercase tracking-widest text-[9px] font-bold text-neutral-500">
+                Feature Film Color Barcode (Scrub Entire Movie)
+              </span>
+              <span>{shots.length.toLocaleString()} Total Cuts</span>
+            </div>
+            <div className="relative h-12 w-full rounded-lg overflow-hidden border border-white/10 cursor-pointer">
+              <canvas
+                ref={barcodeCanvasRef}
+                width={1000}
+                height={48}
+                onClick={handleBarcodeClick}
+                className="w-full h-full object-fill"
+                title="Click anywhere to jump timeline"
+              />
+            </div>
+            <div className="flex items-center justify-between pt-1">
+              <button
+                type="button"
+                onClick={() => setWindowStart(0)}
+                disabled={windowStart === 0}
+                className="px-2.5 py-1 text-[9px] uppercase tracking-wider font-bold rounded bg-neutral-900 text-neutral-300 hover:text-white border border-white/10 disabled:opacity-30"
+              >
+                Start
+              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setWindowStart((w) => Math.max(0, w - WINDOW_SIZE))}
+                  disabled={windowStart === 0}
+                  className="px-3 py-1 text-[9px] uppercase tracking-wider font-bold rounded bg-neutral-900 text-neutral-300 hover:text-white border border-white/10 disabled:opacity-30"
+                >
+                  ← Prev {WINDOW_SIZE}
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setWindowStart((w) =>
+                      Math.min(shots.length - WINDOW_SIZE, w + WINDOW_SIZE)
+                    )
+                  }
+                  disabled={windowStart + WINDOW_SIZE >= shots.length}
+                  className="px-3 py-1 text-[9px] uppercase tracking-wider font-bold rounded bg-neutral-900 text-neutral-300 hover:text-white border border-white/10 disabled:opacity-30"
+                >
+                  Next {WINDOW_SIZE} →
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setWindowStart(Math.max(0, shots.length - WINDOW_SIZE))}
+                disabled={windowStart + WINDOW_SIZE >= shots.length}
+                className="px-2.5 py-1 text-[9px] uppercase tracking-wider font-bold rounded bg-neutral-900 text-neutral-300 hover:text-white border border-white/10 disabled:opacity-30"
+              >
+                End
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Scrollable Panoramic Strip */}
         <div className="overflow-x-auto pb-4 custom-scrollbar">
           <div
             className="flex gap-2 min-w-max p-2.5 bg-neutral-950 rounded-xl border border-white/5"
-            style={{ minWidth: `${Math.max(900, shots.length * 110)}px` }}
+            style={{ minWidth: `${Math.max(900, visibleShots.length * 110)}px` }}
           >
-            {shots.map((shot, idx) => (
-              <div
-                key={shot.id}
-                onClick={() => setSelectedShotIndex(idx)}
-                className={`w-24 sm:w-28 flex flex-col rounded-lg overflow-hidden border cursor-pointer transition-all duration-200 ${
-                  selectedShotIndex === idx
-                    ? "border-white ring-1 ring-white/40 scale-[1.02]"
-                    : "border-white/5 hover:border-white/20 opacity-80 hover:opacity-100"
-                }`}
-              >
-                {/* Thumbnail */}
-                <div className="h-16 bg-neutral-900 overflow-hidden relative">
-                  <img
-                    src={shot.keyframeDataUrl}
-                    alt={`Shot ${shot.shotNumber}`}
-                    className="w-full h-full object-cover"
-                  />
-                  <span className="absolute bottom-1 left-1 bg-black/80 px-1 py-0.5 rounded text-[8px] font-mono text-white font-bold border border-white/10">
-                    #{shot.shotNumber}
-                  </span>
-                </div>
+            {visibleShots.map((shot) => {
+              const originalIndex = shots.findIndex((s) => s.id === shot.id);
+              const isSelected = selectedShotIndex === originalIndex;
 
-                {/* Vertical Color Stripes */}
-                <div className="flex flex-col h-28">
-                  {shot.palette.map((color, cIdx) => (
-                    <div
-                      key={cIdx}
-                      style={{ backgroundColor: color }}
-                      className="flex-1 w-full hover:brightness-110 transition-all relative group"
-                      title={`${color}`}
+              return (
+                <div
+                  key={shot.id}
+                  onClick={() => handleSelectShot(originalIndex)}
+                  className={`w-24 sm:w-28 flex flex-col rounded-lg overflow-hidden border cursor-pointer transition-all duration-200 ${
+                    isSelected
+                      ? "border-white ring-1 ring-white/40 scale-[1.02]"
+                      : "border-white/5 hover:border-white/20 opacity-80 hover:opacity-100"
+                  }`}
+                >
+                  {/* Thumbnail */}
+                  <div className="h-16 bg-neutral-900 overflow-hidden relative">
+                    <img
+                      src={shot.keyframeDataUrl}
+                      alt={`Shot ${shot.shotNumber}`}
+                      className="w-full h-full object-cover"
                     />
-                  ))}
-                </div>
+                    <span className="absolute bottom-1 left-1 bg-black/80 px-1 py-0.5 rounded text-[8px] font-mono text-white font-bold border border-white/10">
+                      #{shot.shotNumber}
+                    </span>
+                  </div>
 
-                {/* Mood Tag */}
-                <div className="p-1.5 bg-neutral-950 text-center border-t border-white/5">
-                  <span className="text-[9px] font-serif italic text-neutral-400 truncate block">
-                    {shot.analysis?.colorMood || `${(shot.luminance * 100).toFixed(0)}% Lum`}
-                  </span>
+                  {/* Vertical Color Stripes */}
+                  <div className="flex flex-col h-28">
+                    {shot.palette.map((color, cIdx) => (
+                      <div
+                        key={cIdx}
+                        style={{ backgroundColor: color }}
+                        className="flex-1 w-full hover:brightness-110 transition-all relative group"
+                        title={`${color}`}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Mood Tag */}
+                  <div className="p-1.5 bg-neutral-950 text-center border-t border-white/5">
+                    <span className="text-[9px] font-serif italic text-neutral-400 truncate block">
+                      {shot.analysis?.colorMood || `${(shot.luminance * 100).toFixed(0)}% Lum`}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -336,8 +493,8 @@ export const ColorScriptView: React.FC<ColorScriptViewProps> = ({
                   <span className="font-serif italic text-base text-white">
                     Shot #{shots[selectedShotIndex].shotNumber}
                   </span>
-                  <span className="text-[10px] text-neutral-500 font-mono">
-                    ({shots[selectedShotIndex].duration}s)
+                  <span className="text-[10px] text-neutral-400 font-mono bg-neutral-900 px-1.5 py-0.5 rounded border border-white/5">
+                    {formatTimecode(shots[selectedShotIndex].startTime)} → {formatTimecode(shots[selectedShotIndex].endTime)} ({shots[selectedShotIndex].duration}s)
                   </span>
                 </div>
                 <p className="text-xs font-serif italic text-neutral-300 mt-0.5">

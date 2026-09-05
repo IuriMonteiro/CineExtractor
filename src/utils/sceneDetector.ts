@@ -6,6 +6,7 @@ interface ProgressData {
   currentSecond: number;
   totalSeconds: number;
   shotsFound: number;
+  stage?: string;
 }
 
 type ProgressCallback = (progress: ProgressData) => void;
@@ -77,7 +78,15 @@ export async function detectScenesFromVideo(
     throw new Error("Invalid video duration");
   }
 
-  // Analytical canvas for fast scene cut detection
+  // Determine scan range (Full duration or custom time range)
+  const scanStart = config.scanRangeMode === "range" ? Math.max(0, config.startTime || 0) : 0;
+  const scanEnd =
+    config.scanRangeMode === "range" && config.endTime > scanStart
+      ? Math.min(duration, config.endTime)
+      : duration;
+  const scanDuration = Math.max(0.1, scanEnd - scanStart);
+
+  // Analytical canvas for fast scene cut detection (small resolution for high throughput)
   const detectCanvas = document.createElement("canvas");
   detectCanvas.width = 160;
   detectCanvas.height = 90;
@@ -95,15 +104,29 @@ export async function detectScenesFromVideo(
     throw new Error("Canvas context initialization failed");
   }
 
-  const sampleInterval = 1 / config.sampleFps; // e.g. every 0.16s for 6fps
-  let previousHist: Float32Array | null = null;
-  const shotCutPoints: number[] = [0]; // always starts at 0
+  // Adaptive sampling calculation:
+  // For long videos (e.g. 5m, 1h, 2h), keep step interval responsive to prevent browser stalling
+  let effectiveFps = config.sampleFps || 3;
+  if (scanDuration > 3600 && effectiveFps > 1.5) {
+    // Feature film > 1 hour: 1.0 to 1.5 fps provides fast, full-movie cut detection in minutes
+    effectiveFps = 1.0;
+  } else if (scanDuration > 600 && effectiveFps > 2.5) {
+    // 10min to 1 hour: 2.0 fps
+    effectiveFps = 2.0;
+  }
+  const sampleInterval = 1 / effectiveFps;
 
-  let currentTime = 0;
+  // Shot limit calculation: if maxShots is 0 or undefined, there is NO limit (extract ALL cuts in video)
+  const hasShotLimit = typeof config.maxShots === "number" && config.maxShots > 0;
+  const maxAllowedShots = hasShotLimit ? config.maxShots : Infinity;
+  let previousHist: Float32Array | null = null;
+  const shotCutPoints: number[] = [scanStart]; // starts at scanStart
+
+  let currentTime = scanStart;
 
   const seekVideo = (time: number): Promise<void> => {
     const targetTime = Math.max(0, Math.min(time, duration - 0.05));
-    if (Math.abs(video.currentTime - targetTime) < 0.02) {
+    if (Math.abs(video.currentTime - targetTime) < 0.04) {
       return Promise.resolve();
     }
     return new Promise((resolve) => {
@@ -113,19 +136,27 @@ export async function detectScenesFromVideo(
         video.removeEventListener("seeked", onSeeked);
         resolve();
       };
+      // 350ms timeout ensures no freeze if a frame seek takes too long on high-bitrate movies
       timeoutId = setTimeout(() => {
         video.removeEventListener("seeked", onSeeked);
         resolve();
-      }, 600);
+      }, 350);
       video.addEventListener("seeked", onSeeked, { once: true });
       video.currentTime = targetTime;
     });
   };
 
-  // 1. Pass 1: Scan video to identify scene transitions
-  while (currentTime < duration) {
+  // 1. Pass 1: Scan video across specified window to identify scene transitions
+  let loopStep = 0;
+  while (currentTime < scanEnd) {
     if (abortSignal?.aborted) {
       throw new Error("Scene detection cancelled by user");
+    }
+
+    loopStep++;
+    // Yield to the browser event loop periodically to prevent UI thread starvation
+    if (loopStep % 6 === 0) {
+      await new Promise((r) => setTimeout(r, 0));
     }
 
     await seekVideo(currentTime);
@@ -141,7 +172,7 @@ export async function detectScenesFromVideo(
       // Check if scene change threshold met and minimum shot duration respected
       if (delta >= config.sensitivity && timeSinceLastCut >= config.minShotDuration) {
         shotCutPoints.push(currentTime);
-        if (shotCutPoints.length >= config.maxShots) {
+        if (shotCutPoints.length >= maxAllowedShots) {
           break;
         }
       }
@@ -151,8 +182,9 @@ export async function detectScenesFromVideo(
     currentTime += sampleInterval;
 
     if (onProgress) {
+      const progressRatio = Math.min(1, Math.max(0, (currentTime - scanStart) / scanDuration));
       onProgress({
-        percentage: Math.min(50, Math.round((currentTime / duration) * 50)),
+        percentage: Math.min(50, Math.round(progressRatio * 50)),
         currentSecond: currentTime,
         totalSeconds: duration,
         shotsFound: shotCutPoints.length,
@@ -160,19 +192,38 @@ export async function detectScenesFromVideo(
     }
   }
 
-  // Ensure end of video boundary
-  if (shotCutPoints[shotCutPoints.length - 1] < duration - 0.2) {
-    shotCutPoints.push(duration);
+  // Ensure end of scan boundary
+  if (shotCutPoints[shotCutPoints.length - 1] < scanEnd - 0.2) {
+    shotCutPoints.push(scanEnd);
   } else {
-    shotCutPoints[shotCutPoints.length - 1] = duration;
+    shotCutPoints[shotCutPoints.length - 1] = scanEnd;
   }
 
-  // 2. Pass 2: Extract high quality keyframes and color profiles for each detected shot
+  // 2. Pass 2: Extract keyframes and color profiles for each detected shot
+  const totalShotsToExtract = shotCutPoints.length - 1;
   const detectedShots: Shot[] = [];
 
-  for (let i = 0; i < shotCutPoints.length - 1; i++) {
+  // Dynamic keyframe resolution based on shot count:
+  // For massive extractions (> 300 shots, e.g. 1,000 to 20,000 cuts), 854x480 at 0.74 keeps memory ~25-35KB per shot
+  // ensuring the entire movie color script easily fits within browser memory.
+  const targetWidth =
+    totalShotsToExtract > 1000
+      ? Math.min(nativeW, 640)
+      : totalShotsToExtract > 300
+      ? Math.min(nativeW, 854)
+      : Math.min(nativeW, 1280);
+  highResCanvas.width = targetWidth;
+  highResCanvas.height = Math.max(1, Math.round((targetWidth / nativeW) * nativeH));
+  const jpegQuality = totalShotsToExtract > 1000 ? 0.72 : totalShotsToExtract > 300 ? 0.76 : 0.82;
+
+  for (let i = 0; i < totalShotsToExtract; i++) {
     if (abortSignal?.aborted) {
       throw new Error("Scene detection cancelled by user");
+    }
+
+    // Yield to the browser event loop regularly to prevent thread locking
+    if (i % 2 === 0) {
+      await new Promise((r) => setTimeout(r, 0));
     }
 
     const shotStart = shotCutPoints[i];
@@ -185,7 +236,7 @@ export async function detectScenesFromVideo(
     await seekVideo(keyframeTime);
     highResCtx.drawImage(video, 0, 0, highResCanvas.width, highResCanvas.height);
 
-    const keyframeDataUrl = highResCanvas.toDataURL("image/jpeg", 0.88);
+    const keyframeDataUrl = highResCanvas.toDataURL("image/jpeg", jpegQuality);
     const colorMetrics = extractColorMetrics(highResCanvas);
 
     const shot: Shot = {
@@ -207,12 +258,13 @@ export async function detectScenesFromVideo(
     detectedShots.push(shot);
 
     if (onProgress) {
-      const secondPassPercent = 50 + Math.round(((i + 1) / (shotCutPoints.length - 1)) * 50);
+      const secondPassPercent = 50 + Math.round(((i + 1) / totalShotsToExtract) * 50);
       onProgress({
         percentage: secondPassPercent,
         currentSecond: keyframeTime,
         totalSeconds: duration,
         shotsFound: detectedShots.length,
+        stage: `Extracting shot #${i + 1} of ${totalShotsToExtract} (${detectedShots.length} captured)...`,
       });
     }
   }
